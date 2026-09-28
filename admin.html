@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Редактор данных — Табло заработка</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+  <header class="board-header">
+    <div class="board-header__title">
+      <span class="board-header__eyebrow">ADMIN</span>
+      <h1>Редактор данных</h1>
+    </div>
+    <div class="board-header__controls">
+      <a href="index.html" class="admin-back-link">← вернуться к табло</a>
+    </div>
+  </header>
+
+  <main class="admin-wrap">
+
+    <section class="admin-panel" id="setupPanel">
+      <h2>1. Подключение к репозиторию</h2>
+      <p class="admin-hint">
+        Данные сохраняются напрямую в ваш GitHub-репозиторий через официальный API GitHub.
+        Токен хранится только в этом браузере (localStorage) и никуда, кроме api.github.com, не отправляется.
+      </p>
+
+      <div class="admin-grid">
+        <label>Логин / организация на GitHub
+          <input type="text" id="cfgOwner" placeholder="например, ivanov">
+        </label>
+        <label>Название репозитория
+          <input type="text" id="cfgRepo" placeholder="например, zarplata-live">
+        </label>
+        <label>Ветка
+          <input type="text" id="cfgBranch" placeholder="main" value="main">
+        </label>
+        <label>Personal Access Token
+          <input type="password" id="cfgToken" placeholder="ghp_... или github_pat_...">
+        </label>
+      </div>
+
+      <details class="admin-help">
+        <summary>Как получить токен (1 минута, один раз)</summary>
+        <ol>
+          <li>Зайти на <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings/personal-access-tokens/new</a></li>
+          <li>Token name — любое, например «zarplata-live-admin»</li>
+          <li>Repository access → Only select repositories → выбрать именно этот репозиторий</li>
+          <li>Permissions → Repository permissions → Contents → выставить «Read and write»</li>
+          <li>Generate token → скопировать значение (оно покажется только один раз) и вставить в поле выше</li>
+        </ol>
+        <p>Токен даёт доступ только к содержимому этого одного репозитория — не к всему аккаунту.
+        Не вставляйте его на чужих/общих компьютерах и не публикуйте его нигде.</p>
+      </details>
+
+      <button type="button" id="btnConnect" class="admin-btn admin-btn--primary">Подключиться и загрузить данные</button>
+      <span id="connectStatus" class="admin-status"></span>
+    </section>
+
+    <section class="admin-panel" id="editPanel" hidden>
+      <h2>2. Люди</h2>
+      <div id="peopleList" class="admin-people-list"></div>
+      <button type="button" id="btnAddPerson" class="admin-btn">+ Добавить человека</button>
+
+      <div class="admin-save-row">
+        <button type="button" id="btnSave" class="admin-btn admin-btn--primary">Сохранить на GitHub</button>
+        <span id="saveStatus" class="admin-status"></span>
+      </div>
+    </section>
+
+  </main>
+
+<script src="admin.js"></script>
+</body>
+</html>
