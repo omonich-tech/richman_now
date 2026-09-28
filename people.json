@@ -5,7 +5,7 @@
     "age": 28,
     "position": "Супервайзер",
     "photo": "photos/aziz.jpg",
-    "salaryUZS": 999999999
+    "salaryUZS": 10000000
   },
   {
     "id": "dilnoza-yusupova",
@@ -13,7 +13,7 @@
     "age": 22,
     "position": "Менеджер по продажам",
     "photo": "photos/dilnoza.jpg",
-    "salaryUZS": 999999999999999
+    "salaryUZS": 20000000
   },
   {
     "id": "sardor-rashidov",
@@ -21,6 +21,6 @@
     "age": 28,
     "position": "UIX",
     "photo": "photos/sardor.jpg",
-    "salaryUZS": 22000000
+    "salaryUZS": 40000000
   }
 ]
