@@ -1,290 +1,134 @@
 /* ==========================================================
-   Админка: читает и пишет people.json (и фото) напрямую в GitHub
-   репозиторий через официальный REST API, без какого-либо бэкенда.
-   Токен хранится только в localStorage этого браузера.
+   Простой редактор без GitHub API и токенов.
+   Форма собирает данные и печатает готовый JSON для ручной
+   вставки в people.json на GitHub (через обычный карандаш-редактор).
    ========================================================== */
 
-const LS_KEY = 'zarplataLiveAdminConfig';
+let people = [];
 
-let cfg = { owner: '', repo: '', branch: 'main', token: '' };
-let peopleData = [];
-let currentSha = null; // sha текущей версии people.json — нужен GitHub API для обновления файла
-
-/* ---------- utf-8-safe base64 (важно из-за кириллицы) ---------- */
-
-function utf8ToBase64(str) {
-  const bytes = new TextEncoder().encode(str);
-  let binary = '';
-  bytes.forEach((b) => { binary += String.fromCharCode(b); });
-  return btoa(binary);
+function emptyPerson() {
+  return { id: `person-${Date.now()}`, name: '', age: '', position: '', photo: '', salaryUZS: '' };
 }
 
-function base64ToUtf8(b64) {
-  const binary = atob(b64.replace(/\n/g, ''));
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return new TextDecoder('utf-8').decode(bytes);
-}
+function renderForm() {
+  const container = document.getElementById('peopleForm');
+  container.innerHTML = '';
 
-/* ---------- localStorage конфиг (без токена — токен вводится каждый раз для безопасности) ---------- */
+  people.forEach((person, index) => {
+    const block = document.createElement('div');
+    block.className = 'person-block';
+    block.dataset.index = index;
 
-function loadSavedConfig() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
-    document.getElementById('cfgOwner').value = saved.owner || '';
-    document.getElementById('cfgRepo').value = saved.repo || '';
-    document.getElementById('cfgBranch').value = saved.branch || 'main';
-  } catch (e) { /* ничего страшного, просто пустая форма */ }
-}
+    block.innerHTML = `
+      <button type="button" class="remove-btn" data-action="remove" title="Удалить">✕</button>
 
-function saveConfigToStorage() {
-  localStorage.setItem(LS_KEY, JSON.stringify({ owner: cfg.owner, repo: cfg.repo, branch: cfg.branch }));
-}
+      <label class="person-block__full">Имя
+        <input type="text" data-field="name" value="${escapeAttr(person.name)}" placeholder="Азиз Каримов">
+      </label>
 
-/* ---------- статусы ---------- */
+      <label>Должность
+        <input type="text" data-field="position" value="${escapeAttr(person.position)}" placeholder="Frontend Developer">
+      </label>
 
-function setStatus(elId, text, kind) {
-  const el = document.getElementById(elId);
-  el.textContent = text;
-  el.className = 'admin-status' + (kind ? ` is-${kind}` : '');
-}
+      <label>Возраст
+        <input type="number" data-field="age" value="${escapeAttr(person.age)}" placeholder="29">
+      </label>
 
-/* ---------- GitHub API helpers ---------- */
+      <label class="person-block__full">Оклад в месяц, сум
+        <input type="number" data-field="salaryUZS" value="${escapeAttr(person.salaryUZS)}" placeholder="10000000">
+      </label>
 
-function apiHeaders() {
-  return {
-    Authorization: `Bearer ${cfg.token}`,
-    Accept: 'application/vnd.github+json',
-    'X-GitHub-Api-Version': '2022-11-28',
-  };
-}
-
-async function githubGetFile(path) {
-  const url = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${path}?ref=${encodeURIComponent(cfg.branch)}`;
-  const res = await fetch(url, { headers: apiHeaders() });
-  if (res.status === 404) return null;
-  if (!res.ok) throw await describeError(res);
-  return res.json();
-}
-
-async function githubPutFile(path, base64Content, message, sha) {
-  const url = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${path}`;
-  const body = {
-    message,
-    content: base64Content,
-    branch: cfg.branch,
-  };
-  if (sha) body.sha = sha;
-
-  const res = await fetch(url, {
-    method: 'PUT',
-    headers: { ...apiHeaders(), 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw await describeError(res);
-  return res.json();
-}
-
-async function describeError(res) {
-  let detail = '';
-  try { detail = (await res.json()).message || ''; } catch (e) { /* noop */ }
-  const map = {
-    401: 'токен неверный или истёк',
-    403: 'нет прав — проверьте, что у токена включено Contents: Read and write для этого репозитория',
-    404: 'репозиторий/ветка/файл не найдены — проверьте логин, название репозитория и ветку',
-    409: 'конфликт версий файла — кто-то изменил его параллельно, нажмите «Подключиться» ещё раз, чтобы перечитать актуальную версию',
-  };
-  return new Error(map[res.status] || `ошибка GitHub API (${res.status}): ${detail}`);
-}
-
-/* ---------- загрузка people.json ---------- */
-
-async function connectAndLoad() {
-  cfg.owner = document.getElementById('cfgOwner').value.trim();
-  cfg.repo = document.getElementById('cfgRepo').value.trim();
-  cfg.branch = document.getElementById('cfgBranch').value.trim() || 'main';
-  cfg.token = document.getElementById('cfgToken').value.trim();
-
-  if (!cfg.owner || !cfg.repo || !cfg.token) {
-    setStatus('connectStatus', 'заполните логин, репозиторий и токен', 'error');
-    return;
-  }
-
-  setStatus('connectStatus', 'загрузка…', null);
-
-  try {
-    const file = await githubGetFile('people.json');
-    if (!file) {
-      // файла ещё нет — начнём с пустого списка, он создастся при первом сохранении
-      peopleData = [];
-      currentSha = null;
-    } else {
-      peopleData = JSON.parse(base64ToUtf8(file.content));
-      currentSha = file.sha;
-    }
-
-    saveConfigToStorage();
-    setStatus('connectStatus', `подключено ✓ (${peopleData.length} чел.)`, 'ok');
-    document.getElementById('editPanel').hidden = false;
-    renderPeopleList();
-  } catch (err) {
-    setStatus('connectStatus', err.message, 'error');
-  }
-}
-
-/* ---------- рендер формы редактирования ---------- */
-
-function initialsAvatarUrl(name) {
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name || '?')}&background=1f4a38&color=eae7dd&size=128&bold=true`;
-}
-
-function renderPeopleList() {
-  const list = document.getElementById('peopleList');
-  list.innerHTML = '';
-
-  peopleData.forEach((person, index) => {
-    const row = document.createElement('div');
-    row.className = 'admin-person';
-    row.dataset.index = index;
-
-    const photoSrc = person.photo || initialsAvatarUrl(person.name);
-
-    row.innerHTML = `
-      <button type="button" class="admin-person__remove" title="Удалить" data-action="remove">✕</button>
-
-      <div class="admin-person__photo-col">
-        <img class="admin-person__preview" src="${photoSrc}"
-             onerror="this.onerror=null; this.src='${initialsAvatarUrl(person.name)}';">
-        <label class="admin-person__upload">
-          загрузить фото
-          <input type="file" accept="image/*" data-role="photo-file">
-        </label>
-      </div>
-
-      <div class="admin-person__fields">
-        <label class="admin-field admin-field--full">Имя
-          <input type="text" data-field="name" value="${escapeAttr(person.name || '')}">
-        </label>
-        <label class="admin-field">Должность
-          <input type="text" data-field="position" value="${escapeAttr(person.position || '')}">
-        </label>
-        <label class="admin-field">Возраст
-          <input type="number" data-field="age" value="${person.age ?? ''}">
-        </label>
-        <label class="admin-field admin-field--full">Оклад в месяц, UZS
-          <input type="number" data-field="salaryUZS" value="${person.salaryUZS ?? ''}">
-        </label>
-        <label class="admin-field admin-field--full">Путь к фото (заполняется автоматически при загрузке)
-          <input type="text" data-field="photo" value="${escapeAttr(person.photo || '')}">
-        </label>
-      </div>
+      <label class="person-block__full">
+        Путь к фото (необязательно — без фото подставится аватар с инициалами)
+        <input type="text" data-field="photo" value="${escapeAttr(person.photo)}" placeholder="photos/aziz.jpg">
+      </label>
     `;
 
-    list.appendChild(row);
+    container.appendChild(block);
   });
+
+  updateOutput();
 }
 
-function escapeAttr(str) {
-  return String(str).replace(/"/g, '&quot;');
+function escapeAttr(v) {
+  return String(v ?? '').replace(/"/g, '&quot;');
 }
 
-/* ---------- синхронизация значений формы -> peopleData ---------- */
-
-function syncFormToData() {
-  document.querySelectorAll('.admin-person').forEach((row) => {
-    const index = Number(row.dataset.index);
-    const person = peopleData[index];
+function syncFormToPeople() {
+  document.querySelectorAll('.person-block').forEach((block) => {
+    const index = Number(block.dataset.index);
+    const person = people[index];
     if (!person) return;
-    row.querySelectorAll('[data-field]').forEach((input) => {
+    block.querySelectorAll('[data-field]').forEach((input) => {
       const field = input.dataset.field;
-      if (field === 'age' || field === 'salaryUZS') {
-        person[field] = Number(input.value) || 0;
-      } else {
-        person[field] = input.value;
-      }
+      person[field] = field === 'age' || field === 'salaryUZS' ? Number(input.value) || 0 : input.value;
     });
   });
 }
 
-/* ---------- добавление / удаление ---------- */
+function updateOutput() {
+  syncFormToPeople();
+  const clean = people.map(({ id, name, age, position, photo, salaryUZS }) => ({
+    id: id || `person-${Date.now()}`,
+    name,
+    age: Number(age) || 0,
+    position,
+    photo: photo || '',
+    salaryUZS: Number(salaryUZS) || 0,
+  }));
+  document.getElementById('output').value = JSON.stringify(clean, null, 2);
+}
 
 function addPerson() {
-  syncFormToData();
-  peopleData.push({ id: `person-${Date.now()}`, name: '', age: 0, position: '', photo: '', salaryUZS: 0 });
-  renderPeopleList();
+  syncFormToPeople();
+  people.push(emptyPerson());
+  renderForm();
 }
 
 function removePerson(index) {
-  syncFormToData();
-  peopleData.splice(index, 1);
-  renderPeopleList();
+  syncFormToPeople();
+  people.splice(index, 1);
+  renderForm();
 }
 
-/* ---------- загрузка фото в репозиторий ---------- */
-
-async function uploadPhoto(index, file) {
-  syncFormToData();
-  setStatus('saveStatus', 'загрузка фото…', null);
-
+async function copyOutput() {
+  const text = document.getElementById('output').value;
+  const statusEl = document.getElementById('copyStatus');
   try {
-    const dataUrl = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-    const base64Content = dataUrl.split(',')[1];
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const path = `photos/${Date.now()}-${safeName}`;
-
-    await githubPutFile(path, base64Content, `Загрузка фото: ${safeName}`, null);
-
-    peopleData[index].photo = path;
-    renderPeopleList();
-    setStatus('saveStatus', 'фото загружено ✓ — не забудьте нажать «Сохранить на GitHub»', 'ok');
+    await navigator.clipboard.writeText(text);
+    statusEl.textContent = 'скопировано ✓';
   } catch (err) {
-    setStatus('saveStatus', `не удалось загрузить фото: ${err.message}`, 'error');
+    // резервный способ для старых браузеров
+    const ta = document.getElementById('output');
+    ta.focus();
+    ta.select();
+    document.execCommand('copy');
+    statusEl.textContent = 'скопировано ✓';
   }
-}
-
-/* ---------- сохранение people.json ---------- */
-
-async function saveToGithub() {
-  syncFormToData();
-  setStatus('saveStatus', 'сохранение…', null);
-
-  const json = JSON.stringify(peopleData, null, 2);
-  const base64Content = utf8ToBase64(json);
-
-  try {
-    const result = await githubPutFile('people.json', base64Content, 'Обновление данных через админ-панель', currentSha);
-    currentSha = result.content.sha;
-    setStatus('saveStatus', 'сохранено ✓ — сайт обновится за 30–60 секунд', 'ok');
-  } catch (err) {
-    setStatus('saveStatus', err.message, 'error');
-  }
+  setTimeout(() => { statusEl.textContent = ''; }, 2500);
 }
 
 /* ---------- события ---------- */
 
-document.getElementById('btnConnect').addEventListener('click', connectAndLoad);
-document.getElementById('btnAddPerson').addEventListener('click', addPerson);
-document.getElementById('btnSave').addEventListener('click', saveToGithub);
+document.getElementById('btnAdd').addEventListener('click', addPerson);
+document.getElementById('btnCopy').addEventListener('click', copyOutput);
 
-document.getElementById('peopleList').addEventListener('click', (e) => {
+document.getElementById('peopleForm').addEventListener('click', (e) => {
   const removeBtn = e.target.closest('[data-action="remove"]');
-  if (removeBtn) {
-    const row = removeBtn.closest('.admin-person');
-    removePerson(Number(row.dataset.index));
-  }
+  if (removeBtn) removePerson(Number(removeBtn.closest('.person-block').dataset.index));
 });
 
-document.getElementById('peopleList').addEventListener('change', (e) => {
-  if (e.target.matches('[data-role="photo-file"]')) {
-    const row = e.target.closest('.admin-person');
-    const index = Number(row.dataset.index);
-    if (e.target.files[0]) uploadPhoto(index, e.target.files[0]);
-  }
-});
+document.getElementById('peopleForm').addEventListener('input', updateOutput);
 
-loadSavedConfig();
+/* ---------- при открытии пытаемся подтянуть текущих людей из people.json ---------- */
+
+(async function init() {
+  try {
+    const res = await fetch('./people.json');
+    const data = await res.json();
+    people = Array.isArray(data) && data.length ? data : [emptyPerson()];
+  } catch (err) {
+    people = [emptyPerson()];
+  }
+  renderForm();
+})();
