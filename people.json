@@ -1,25 +1,25 @@
 [
   {
     "id": "aziz-karimov",
-    "name": "Азиз Каримов",
-    "age": 29,
-    "position": "Senior Frontend Developer",
+    "name": "Фаррух Омонов",
+    "age": 28,
+    "position": "Супервайзер",
     "photo": "photos/aziz.jpg",
-    "salaryUZS": 10000000
+    "salaryUZS": 8000000
   },
   {
     "id": "dilnoza-yusupova",
-    "name": "Дилноза Юсупова",
-    "age": 34,
-    "position": "Product Manager",
+    "name": "Суннат Султанов",
+    "age": 22,
+    "position": "Менеджер по продажам",
     "photo": "photos/dilnoza.jpg",
-    "salaryUZS": 14000000
+    "salaryUZS": 10000000
   },
   {
     "id": "sardor-rashidov",
-    "name": "Сардор Рашидов",
-    "age": 41,
-    "position": "Head of Sales",
+    "name": "Садокат Акрамова",
+    "age": 28,
+    "position": "UIX",
     "photo": "photos/sardor.jpg",
     "salaryUZS": 22000000
   }
