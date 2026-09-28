@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Табло заработка — в реальном времени</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💵</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header class="board-header">
+    <div class="board-header__title">
+      <span class="board-header__eyebrow">LIVE PAYROLL BOARD</span>
+      <h1>Табло заработка</h1>
+    </div>
+
+    <div class="board-header__controls">
+      <div class="currency-switch" role="group" aria-label="Валюта отображения">
+        <button type="button" class="currency-switch__btn is-active" data-currency="UZS">UZS</button>
+        <button type="button" class="currency-switch__btn" data-currency="USD">USD</button>
+        <button type="button" class="currency-switch__btn" data-currency="EUR">EUR</button>
+        <button type="button" class="currency-switch__btn" data-currency="RUB">RUB</button>
+      </div>
+      <div class="rate-status" id="rateStatus">курс: загрузка…</div>
+    </div>
+  </header>
+
+  <main id="cardsGrid" class="cards-grid" aria-live="off">
+    <!-- карточки генерируются из people.json -->
+  </main>
+
+  <footer class="board-footer">
+    <p>
+      Значения «в среднем» рассчитаны из месячного оклада (месяц ≈ 30.44 дня, год = 12 окладов).
+      Курсы — Центральный банк Узбекистана, при недоступности — открытый резервный источник.
+    </p>
+  </footer>
+
+<script src="app.js"></script>
+</body>
+</html>

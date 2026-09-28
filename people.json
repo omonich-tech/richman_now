@@ -1,0 +1,26 @@
+[
+  {
+    "id": "aziz-karimov",
+    "name": "Азиз Каримов",
+    "age": 29,
+    "position": "Senior Frontend Developer",
+    "photo": "photos/aziz.jpg",
+    "salaryUZS": 10000000
+  },
+  {
+    "id": "dilnoza-yusupova",
+    "name": "Дилноза Юсупова",
+    "age": 34,
+    "position": "Product Manager",
+    "photo": "photos/dilnoza.jpg",
+    "salaryUZS": 14000000
+  },
+  {
+    "id": "sardor-rashidov",
+    "name": "Сардор Рашидов",
+    "age": 41,
+    "position": "Head of Sales",
+    "photo": "photos/sardor.jpg",
+    "salaryUZS": 22000000
+  }
+]
